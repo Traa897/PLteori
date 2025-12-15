@@ -66,7 +66,7 @@ class JadwalController {
         require_once 'views/jadwal/index.php';
     }
 
-    public function create() {
+   public function create() {
         if(session_status() == PHP_SESSION_NONE) session_start();
         
         if(!isset($_SESSION['admin_id'])) {
@@ -75,7 +75,8 @@ class JadwalController {
             exit();
         }
         
-        $films = $this->film->readAll()->fetchAll(PDO::FETCH_ASSOC);
+        // PERBAIKAN: Gunakan method yang menampilkan SEMUA film termasuk yang tanpa jadwal
+        $films = $this->film->readAllIncludingNoSchedule()->fetchAll(PDO::FETCH_ASSOC);
         $bioskops = $this->bioskop->readAll()->fetchAll(PDO::FETCH_ASSOC);
         require_once 'views/jadwal/create.php';
     }
@@ -198,5 +199,5 @@ class JadwalController {
             }
         }
     }
-}
+}   
 ?>

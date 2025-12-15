@@ -16,24 +16,36 @@ class AdminController {
         $this->transaksi = new Transaksi($this->db);
         $this->qb = new QueryBuilder($this->db);
         
-        if(session_status() == PHP_SESSION_NONE) session_start();
+        // PERBAIKAN: Start session di sini
+        if(session_status() == PHP_SESSION_NONE) {
+            session_start();
+        }
         
-        // Check if user is admin
+        // PERBAIKAN: Check admin lebih ketat - tapi jangan redirect di constructor
+        // Biarkan index.php yang handle authentication
+    }
+
+    // DEFAULT INDEX - Redirect to Dashboard
+    public function index() {
+        // Check admin session
         if(!isset($_SESSION['admin_id'])) {
             $_SESSION['flash'] = 'Anda harus login sebagai admin!';
             header("Location: index.php?module=auth&action=index");
             exit();
         }
-    }
-
-    // DEFAULT INDEX - Redirect to Dashboard
-    public function index() {
         $this->dashboard();
     }
 
-    // Dashboard Admin - FIXED
+    // Dashboard Admin
     public function dashboard() {
-        // Get statistics - SEMUA FILM (termasuk yang tidak ada jadwal)
+        // Check admin session
+        if(!isset($_SESSION['admin_id'])) {
+            $_SESSION['flash'] = 'Anda harus login sebagai admin!';
+            header("Location: index.php?module=auth&action=index");
+            exit();
+        }
+        
+        // Get statistics
         $totalFilms = $this->qb->reset()->table('Film')->count();
         $totalBioskops = $this->qb->reset()->table('Bioskop')->count();
         $totalJadwals = $this->qb->reset()->table('Jadwal_Tayang')->count();
@@ -44,7 +56,7 @@ class AdminController {
         $transaksiSuccess = $this->transaksi->countByStatus('berhasil');
         $totalRevenue = $this->transaksi->getTotalRevenue();
         
-        // Get recent transactions (last 10) - FIXED with LEFT JOIN
+        // Get recent transactions
         $query = "SELECT t.*, 
                          u.nama_lengkap as nama_user,
                          u.email,
@@ -78,7 +90,7 @@ class AdminController {
         $stmt->execute();
         $topFilms = $stmt->fetchAll(PDO::FETCH_ASSOC);
         
-        // Get monthly revenue (6 months)
+        // Get monthly revenue
         $query = "SELECT 
                     DATE_FORMAT(tanggal_transaksi, '%Y-%m') as bulan,
                     COUNT(*) as jumlah_transaksi,
@@ -92,14 +104,21 @@ class AdminController {
         $stmt->execute();
         $monthlyRevenue = $stmt->fetchAll(PDO::FETCH_ASSOC);
         
-        // Get all films for management
+        // Get all films
         $stmt = $this->film->readAll();
         $films = $stmt->fetchAll(PDO::FETCH_ASSOC);
         
         require_once 'views/admin/dashboard.php';
     }
 
-    // CREATE Film - Show form
+    // Ganti Password - NEW METHOD
+    public function gantiPassword() {
+        // Redirect ke AuthController
+        header('Location: index.php?module=auth&action=gantiPasswordAdmin');
+        exit();
+    }
+
+    // CREATE Film
     public function createFilm() {
         $genre = new Genre($this->db);
         $genres = $genre->readAll()->fetchAll(PDO::FETCH_ASSOC);
@@ -107,7 +126,7 @@ class AdminController {
         require_once 'views/admin/create_film.php';
     }
     
-    // STORE Film - Save new film
+    // STORE Film
     public function storeFilm() {
         if($_SERVER['REQUEST_METHOD'] == 'POST') {
             $this->film->judul_film = $_POST['judul_film'];
@@ -130,7 +149,7 @@ class AdminController {
         }
     }
     
-    // EDIT Film - Show edit form
+    // EDIT Film
     public function editFilm() {
         if(!isset($_GET['id'])) {
             header("Location: index.php?module=admin&action=dashboard");
@@ -333,26 +352,6 @@ class AdminController {
         }
         
         header("Location: index.php?module=admin&action=kelolaUser");
-        exit();
-    }
-
-    public function cleanExpiredFilms() {
-        if(session_status() == PHP_SESSION_NONE) session_start();
-        
-        if(!isset($_SESSION['admin_id'])) {
-            $_SESSION['flash'] = 'Anda harus login sebagai admin!';
-            header("Location: index.php?module=auth&action=index");
-            exit();
-        }
-        
-        // Hapus film yang semua jadwalnya sudah lewat
-        if($this->film->autoDeleteExpiredFilms()) {
-            $_SESSION['flash'] = 'Film dengan jadwal kadaluarsa berhasil dihapus!';
-        } else {
-            $_SESSION['flash'] = 'Tidak ada film yang perlu dihapus';
-        }
-        
-        header("Location: index.php?module=admin&action=dashboard");
         exit();
     }
 }

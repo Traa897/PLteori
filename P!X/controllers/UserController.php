@@ -129,4 +129,11 @@ class UserController {
         
         require_once 'views/user/detail_tiket.php';
     }
+    
+    // Ganti Password - NEW METHOD
+    public function gantiPassword() {
+        // Redirect ke AuthController
+        header('Location: index.php?module=auth&action=gantiPasswordUser');
+        exit();
+    }
 }

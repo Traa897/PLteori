@@ -20,7 +20,6 @@ class AuthController {
 
     // Show Login Form
     public function index() {
-        // Jangan load header.php karena sudah ada di login.php
         require_once 'views/auth/login.php';
     }
 
@@ -39,12 +38,10 @@ class AuthController {
         $stmt->execute();
         $adminCheck = $stmt->fetch(PDO::FETCH_ASSOC);
 
-        // Jika username ditemukan di tabel Admin, maka role = admin
-        $role = $adminCheck ?  'admin': 'user';
+        $role = $adminCheck ? 'admin' : 'user';
 
         if($role === 'admin') {
-            // ADMIN LOGIN - PERBAIKAN
-            // Langsung cek di database tanpa hashing dulu
+            // ADMIN LOGIN
             $query = "SELECT * FROM Admin WHERE username = :username LIMIT 1";
             $stmt = $this->db->prepare($query);
             $stmt->bindParam(':username', $username);
@@ -52,20 +49,16 @@ class AuthController {
             $admin = $stmt->fetch(PDO::FETCH_ASSOC);
             
             if($admin) {
-                // Cek password - bisa plain text atau hashed
                 $passwordValid = false;
                 
-                // Cek apakah password di database adalah plain text
                 if($admin['password'] === $password) {
                     $passwordValid = true;
                 }
-                // Atau cek dengan password_verify untuk password yang di-hash
                 elseif(password_verify($password, $admin['password'])) {
                     $passwordValid = true;
                 }
                 
                 if($passwordValid) {
-                    // Login berhasil
                     $_SESSION['admin_id'] = $admin['id_admin'];
                     $_SESSION['admin_username'] = $admin['username'];
                     $_SESSION['admin_name'] = $admin['nama_lengkap'];
@@ -77,7 +70,6 @@ class AuthController {
                 }
             }
             
-            // Login gagal
             $error = 'Username atau password admin salah';
             require_once 'views/auth/login.php';
             
@@ -108,28 +100,24 @@ class AuthController {
             $nama_lengkap = isset($_POST['nama_lengkap']) ? trim($_POST['nama_lengkap']) : '';
             $no_telpon = isset($_POST['no_telpon']) ? trim($_POST['no_telpon']) : '';
 
-            // Validasi
             if($username === '' || $email === '' || $password === '' || $nama_lengkap === '') {
                 $error = 'Semua field wajib diisi';
                 require_once 'views/auth/register.php';
                 return;
             }
 
-            // Check username exists
             if($this->user->usernameExists($username)) {
                 $error = 'Username sudah digunakan';
                 require_once 'views/auth/register.php';
                 return;
             }
 
-            // Check email exists
             if($this->user->emailExists($email)) {
                 $error = 'Email sudah digunakan';
                 require_once 'views/auth/register.php';
                 return;
             }
 
-            // Create user
             $this->user->username = $username;
             $this->user->email = $email;
             $this->user->password = $password;
@@ -151,18 +139,161 @@ class AuthController {
         }
     }
 
-    // Logout
+    // FIXED: Logout - Redirect ke halaman public film
     public function logout() {
-        if(session_status() == PHP_SESSION_NONE) session_start();
+        // Start session jika belum
+        if(session_status() == PHP_SESSION_NONE) {
+            session_start();
+        }
         
-        // Destroy all session data
-        session_unset();
+        // Simpan pesan sebelum destroy session
+        $isAdmin = isset($_SESSION['admin_id']);
+        
+        // Clear all session variables
+        foreach (array_keys($_SESSION) as $key) {
+            unset($_SESSION[$key]);
+        }
+        
+        // Destroy session cookie
+        if (ini_get("session.use_cookies")) {
+            $params = session_get_cookie_params();
+            setcookie(session_name(), '', time() - 42000,
+                $params["path"], $params["domain"],
+                $params["secure"], $params["httponly"]
+            );
+        }
+        
+        // Destroy session
         session_destroy();
         
-        if(session_status() == PHP_SESSION_NONE) session_start();
+        // Start new session for flash message
+        session_start();
         $_SESSION['flash'] = 'Anda telah logout';
+        
+        // Redirect ke halaman public film
         header('Location: index.php?module=film');
         exit();
+    }
+    
+    // ADDED: Ganti Password untuk Admin
+    public function gantiPasswordAdmin() {
+        if(!isset($_SESSION['admin_id'])) {
+            header('Location: index.php?module=auth&action=index');
+            exit();
+        }
+        
+        if($_SERVER['REQUEST_METHOD'] === 'POST') {
+            $password_lama = $_POST['password_lama'] ?? '';
+            $password_baru = $_POST['password_baru'] ?? '';
+            $konfirmasi_password = $_POST['konfirmasi_password'] ?? '';
+            
+            // Validasi
+            if($password_baru !== $konfirmasi_password) {
+                $error = 'Password baru tidak cocok';
+                require_once 'views/admin/ganti_password.php';
+                return;
+            }
+            
+            if(strlen($password_baru) < 6) {
+                $error = 'Password minimal 6 karakter';
+                require_once 'views/admin/ganti_password.php';
+                return;
+            }
+            
+            // Verifikasi password lama
+            $query = "SELECT password FROM Admin WHERE id_admin = :id";
+            $stmt = $this->db->prepare($query);
+            $stmt->bindParam(':id', $_SESSION['admin_id']);
+            $stmt->execute();
+            $admin = $stmt->fetch(PDO::FETCH_ASSOC);
+            
+            $passwordValid = false;
+            if($admin['password'] === $password_lama || password_verify($password_lama, $admin['password'])) {
+                $passwordValid = true;
+            }
+            
+            if(!$passwordValid) {
+                $error = 'Password lama salah';
+                require_once 'views/admin/ganti_password.php';
+                return;
+            }
+            
+            // Update password
+            $password_hash = password_hash($password_baru, PASSWORD_DEFAULT);
+            $query = "UPDATE Admin SET password = :password WHERE id_admin = :id";
+            $stmt = $this->db->prepare($query);
+            $stmt->bindParam(':password', $password_hash);
+            $stmt->bindParam(':id', $_SESSION['admin_id']);
+            
+            if($stmt->execute()) {
+                $_SESSION['flash'] = 'Password berhasil diubah!';
+                header('Location: index.php?module=admin&action=dashboard');
+                exit();
+            } else {
+                $error = 'Gagal mengubah password';
+                require_once 'views/admin/ganti_password.php';
+            }
+        } else {
+            require_once 'views/admin/ganti_password.php';
+        }
+    }
+    
+    // ADDED: Ganti Password untuk User
+    public function gantiPasswordUser() {
+        if(!isset($_SESSION['user_id'])) {
+            header('Location: index.php?module=auth&action=index');
+            exit();
+        }
+        
+        if($_SERVER['REQUEST_METHOD'] === 'POST') {
+            $password_lama = $_POST['password_lama'] ?? '';
+            $password_baru = $_POST['password_baru'] ?? '';
+            $konfirmasi_password = $_POST['konfirmasi_password'] ?? '';
+            
+            // Validasi
+            if($password_baru !== $konfirmasi_password) {
+                $error = 'Password baru tidak cocok';
+                require_once 'views/user/ganti_password.php';
+                return;
+            }
+            
+            if(strlen($password_baru) < 6) {
+                $error = 'Password minimal 6 karakter';
+                require_once 'views/user/ganti_password.php';
+                return;
+            }
+            
+            // Verifikasi password lama
+            $query = "SELECT password FROM User WHERE id_user = :id";
+            $stmt = $this->db->prepare($query);
+            $stmt->bindParam(':id', $_SESSION['user_id']);
+            $stmt->execute();
+            $user = $stmt->fetch(PDO::FETCH_ASSOC);
+            
+            if(!password_verify($password_lama, $user['password'])) {
+                $error = 'Password lama salah';
+                require_once 'views/user/ganti_password.php';
+                return;
+            }
+            
+            // Update password
+            $password_hash = password_hash($password_baru, PASSWORD_DEFAULT);
+            $query = "UPDATE User SET password = :password WHERE id_user = :id";
+            $stmt = $this->db->prepare($query);
+            $stmt->bindParam(':password', $password_hash);
+            $stmt->bindParam(':id', $_SESSION['user_id']);
+            
+            if($stmt->execute()) {
+                $_SESSION['flash'] = 'Password berhasil diubah!';
+                header('Location: index.php?module=user&action=dashboard');
+                exit();
+            } else {
+                $error = 'Gagal mengubah password';
+                require_once 'views/user/ganti_password.php';
+            }
+        } else {
+            require_once 'views/user/ganti_password.php';
+        }
     }
 }
 ?>

@@ -1,5 +1,5 @@
 <?php
-// index.php - FIXED VERSION
+// index.php - UPDATED VERSION
 error_reporting(E_ALL);
 ini_set('display_errors', 1);
 
@@ -17,20 +17,24 @@ $module = isset($_GET['module']) ? $_GET['module'] : 'film';
 $action = isset($_GET['action']) ? $_GET['action'] : 'index';
 
 try {
-    // PERBAIKAN: Batasi akses berdasarkan role dengan lebih flexible
-    
-    // Modul yang butuh login admin
+    // PERBAIKAN: Admin-only actions
     $admin_only_actions = [
-        'admin' => ['dashboard', 'createFilm', 'storeFilm', 'editFilm', 'updateFilm', 'deleteFilm', 'kelolaUser', 'detailUser', 'toggleUserStatus', 'detailTransaksi', 'updateStatus']
+        'admin' => ['dashboard', 'index', 'createFilm', 'storeFilm', 'editFilm', 'updateFilm', 'deleteFilm', 'kelolaUser', 'detailUser', 'toggleUserStatus', 'detailTransaksi', 'updateStatus', 'gantiPassword']
     ];
     
-    // Modul yang butuh login user
+    // Admin-only auth actions
+    $admin_auth_actions = ['gantiPasswordAdmin'];
+    
+    // User-only actions
     $user_only_actions = [
-        'user' => ['dashboard', 'profile', 'updateProfile', 'riwayat', 'detailTiket'],
+        'user' => ['dashboard', 'profile', 'updateProfile', 'riwayat', 'detailTiket', 'gantiPassword'],
         'transaksi' => ['pilihJadwal', 'booking', 'prosesBooking', 'konfirmasi']
     ];
     
-    // Cek akses admin
+    // User-only auth actions
+    $user_auth_actions = ['gantiPasswordUser'];
+    
+    // Check admin access
     if(isset($admin_only_actions[$module]) && in_array($action, $admin_only_actions[$module])) {
         if(!isset($_SESSION['admin_id'])) {
             $_SESSION['flash'] = 'Anda harus login sebagai admin!';
@@ -39,7 +43,16 @@ try {
         }
     }
     
-    // Cek akses user
+    // Check admin auth actions
+    if($module === 'auth' && in_array($action, $admin_auth_actions)) {
+        if(!isset($_SESSION['admin_id'])) {
+            $_SESSION['flash'] = 'Anda harus login sebagai admin!';
+            header('Location: index.php?module=auth&action=index');
+            exit();
+        }
+    }
+    
+    // Check user access
     if(isset($user_only_actions[$module]) && in_array($action, $user_only_actions[$module])) {
         if(!isset($_SESSION['user_id'])) {
             $_SESSION['flash'] = 'Anda harus login sebagai user!';
@@ -48,7 +61,16 @@ try {
         }
     }
     
-    // Inisialisasi controller
+    // Check user auth actions
+    if($module === 'auth' && in_array($action, $user_auth_actions)) {
+        if(!isset($_SESSION['user_id'])) {
+            $_SESSION['flash'] = 'Anda harus login sebagai user!';
+            header('Location: index.php?module=auth&action=index');
+            exit();
+        }
+    }
+    
+    // Initialize controller
     switch ($module) {
         case 'film':
             $controller = new FilmController();
@@ -91,3 +113,4 @@ try {
     header('Location: index.php?module=film');
     exit();
 }
+?>
