@@ -29,7 +29,7 @@ ketika ada film yang telah tayang dan akan tayang tidak tertampilkan
 PERBAIKAN SUDAH BENAR SEMUA 
 
 
-
+...
 -----------
 Penjelasan struktur MVC 
 # Fungsi & Peran dalam Struktur MVC P!X
