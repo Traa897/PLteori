@@ -1,6 +1,6 @@
-
 <?php
 require_once 'models/Jadwal.php';
+require_once 'models/Validator.php';
 
 class JadwalController {
     private $db;
@@ -89,6 +89,15 @@ class JadwalController {
         }
         
         if($_SERVER['REQUEST_METHOD'] == 'POST') {
+            // Validasi dengan OOP Validator
+            $validator = new JadwalValidator($_POST, $this->db);
+            
+            if (!$validator->validate()) {
+                $_SESSION['flash'] = $validator->getFirstError();
+                header("Location: index.php?module=jadwal&action=create");
+                exit();
+            }
+            
             $this->jadwal->id_film = $_POST['id_film'];
             $this->jadwal->id_bioskop = $_POST['id_bioskop'];
             $this->jadwal->nama_tayang = $_POST['nama_tayang'];
@@ -102,7 +111,8 @@ class JadwalController {
                 header("Location: index.php?module=jadwal");
                 exit();
             } else {
-                header("Location: index.php?module=jadwal&action=create&error=Gagal menambahkan jadwal");
+                $_SESSION['flash'] = 'Gagal menambahkan jadwal!';
+                header("Location: index.php?module=jadwal&action=create");
                 exit();
             }
         }
@@ -138,6 +148,14 @@ class JadwalController {
         }
         
         if($_SERVER['REQUEST_METHOD'] == 'POST') {
+            $validator = new JadwalValidator($_POST, $this->db);
+            
+            if (!$validator->validate()) {
+                $_SESSION['flash'] = $validator->getFirstError();
+                header("Location: index.php?module=jadwal&action=edit&id=" . $_POST['id_tayang']);
+                exit();
+            }
+            
             $this->jadwal->id_tayang = $_POST['id_tayang'];
             $this->jadwal->id_film = $_POST['id_film'];
             $this->jadwal->id_bioskop = $_POST['id_bioskop'];
@@ -152,7 +170,8 @@ class JadwalController {
                 header("Location: index.php?module=jadwal");
                 exit();
             } else {
-                header("Location: index.php?module=jadwal&action=edit&id=" . $this->jadwal->id_tayang . "&error=Gagal mengupdate jadwal");
+                $_SESSION['flash'] = 'Gagal mengupdate jadwal!';
+                header("Location: index.php?module=jadwal&action=edit&id=" . $this->jadwal->id_tayang);
                 exit();
             }
         }
@@ -173,7 +192,8 @@ class JadwalController {
                 header("Location: index.php?module=jadwal");
                 exit();
             } else {
-                header("Location: index.php?module=jadwal&error=Gagal menghapus jadwal");
+                $_SESSION['flash'] = 'Gagal menghapus jadwal!';
+                header("Location: index.php?module=jadwal");
                 exit();
             }
         }

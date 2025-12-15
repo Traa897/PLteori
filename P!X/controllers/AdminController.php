@@ -335,5 +335,25 @@ class AdminController {
         header("Location: index.php?module=admin&action=kelolaUser");
         exit();
     }
+
+    public function cleanExpiredFilms() {
+        if(session_status() == PHP_SESSION_NONE) session_start();
+        
+        if(!isset($_SESSION['admin_id'])) {
+            $_SESSION['flash'] = 'Anda harus login sebagai admin!';
+            header("Location: index.php?module=auth&action=index");
+            exit();
+        }
+        
+        // Hapus film yang semua jadwalnya sudah lewat
+        if($this->film->autoDeleteExpiredFilms()) {
+            $_SESSION['flash'] = 'Film dengan jadwal kadaluarsa berhasil dihapus!';
+        } else {
+            $_SESSION['flash'] = 'Tidak ada film yang perlu dihapus';
+        }
+        
+        header("Location: index.php?module=admin&action=dashboard");
+        exit();
+    }
 }
 ?>
